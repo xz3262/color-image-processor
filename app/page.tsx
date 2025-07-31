@@ -118,6 +118,7 @@ export default function Home() {
 
                 {preview && (
                   <div className="mt-4">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={preview}
                       alt="预览"
@@ -238,6 +239,7 @@ export default function Home() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={processedImage.url}
                   alt="处理后的图片"
