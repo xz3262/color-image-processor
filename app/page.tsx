@@ -13,6 +13,7 @@ interface ImageSettings {
   quality: number;
   format: string;
   colorMode: string;
+  maintainAspectRatio: boolean;
 }
 
 interface ProcessedImage {
@@ -30,7 +31,8 @@ export default function Home() {
     height: 600,
     quality: 85,
     format: "jpeg",
-    colorMode: "rgb"
+    colorMode: "rgb",
+    maintainAspectRatio: false
   });
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -206,6 +208,17 @@ export default function Home() {
                       <SelectItem value="cmyk">CMYK</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="aspectRatio"
+                    checked={settings.maintainAspectRatio}
+                    onChange={(e) => setSettings({...settings, maintainAspectRatio: e.target.checked})}
+                    className="h-4 w-4"
+                  />
+                  <Label htmlFor="aspectRatio">保持原始宽高比</Label>
                 </div>
 
                 <Button

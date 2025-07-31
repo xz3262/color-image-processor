@@ -84,15 +84,36 @@ export async function POST(request: NextRequest) {
     // 使用 sharp 处理图片
     let sharpInstance = sharp(buffer);
 
-    // 调整尺寸
-    sharpInstance = sharpInstance.resize(settings.width, settings.height, {
-      fit: "inside",
-      withoutEnlargement: true,
+    // 获取原始图片信息
+    const metadata = await sharpInstance.metadata();
+    console.log("原始图片信息:", {
+      width: metadata.width,
+      height: metadata.height,
+      format: metadata.format,
+      channels: metadata.channels
     });
+
+    // 调整尺寸
+    if (settings.maintainAspectRatio) {
+      // 保持宽高比
+      sharpInstance = sharpInstance.resize(settings.width, settings.height, {
+        fit: "inside", // 保持宽高比，图片完全在指定尺寸内
+        withoutEnlargement: false // 允许放大
+      });
+    } else {
+      // 强制调整到指定尺寸（可能会变形）
+      sharpInstance = sharpInstance.resize(settings.width, settings.height, {
+        fit: "fill", // 使用 fill 强制填充到指定尺寸
+        position: "centre" // 居中裁剪
+      });
+    }
 
     // 颜色模式转换
     if (settings.colorMode === "grayscale") {
       sharpInstance = sharpInstance.grayscale();
+    } else if (settings.colorMode === "cmyk") {
+      // CMYK 模式 - Sharp 不直接支持，但可以调整颜色空间
+      sharpInstance = sharpInstance.toColorspace('cmyk');
     }
 
     // 设置输出格式和质量
@@ -111,6 +132,15 @@ export async function POST(request: NextRequest) {
         break;
     }
 
+    // 获取处理后的图片信息
+    const processedMetadata = await sharp(outputBuffer).metadata();
+    console.log("处理后图片信息:", {
+      width: processedMetadata.width,
+      height: processedMetadata.height,
+      format: settings.format,
+      size: outputBuffer.length
+    });
+
     // 转换为 base64
     const base64Output = outputBuffer.toString("base64");
     const dataUrl = `data:image/${settings.format};base64,${base64Output}`;
@@ -125,7 +155,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       url: dataUrl,
-      settings: settings,
+      settings: {
+        ...settings,
+        actualWidth: processedMetadata.width,
+        actualHeight: processedMetadata.height
+      },
     });
 
   } catch (error) {
