@@ -1,103 +1,257 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { Upload, Download, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+interface ImageSettings {
+  width: number;
+  height: number;
+  quality: number;
+  format: string;
+  colorMode: string;
+}
+
+interface ProcessedImage {
+  url: string;
+  settings: ImageSettings;
+}
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string>("");
+  const [processing, setProcessing] = useState(false);
+  const [processedImage, setProcessedImage] = useState<ProcessedImage | null>(null);
+  const [settings, setSettings] = useState<ImageSettings>({
+    width: 800,
+    height: 600,
+    quality: 85,
+    format: "jpeg",
+    colorMode: "rgb"
+  });
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const processImage = async () => {
+    if (!selectedFile) return;
+
+    setProcessing(true);
+    const formData = new FormData();
+    formData.append("image", selectedFile);
+    formData.append("settings", JSON.stringify(settings));
+
+    try {
+      const response = await fetch("/api/process-image", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("图片处理失败");
+      }
+
+      const data = await response.json();
+      setProcessedImage(data);
+    } catch (error) {
+      console.error("处理错误:", error);
+      alert("图片处理失败，请重试");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const downloadImage = () => {
+    if (!processedImage) return;
+    
+    const link = document.createElement("a");
+    link.href = processedImage.url;
+    link.download = `processed-image.${settings.format}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-8">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-4xl font-bold text-center mb-8">图片处理工具</h1>
+        
+        <div className="grid md:grid-cols-2 gap-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>上传图片</CardTitle>
+              <CardDescription>选择一张图片进行处理</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    id="file-upload"
+                  />
+                  <label
+                    htmlFor="file-upload"
+                    className="cursor-pointer flex flex-col items-center"
+                  >
+                    <Upload className="w-12 h-12 text-gray-400 mb-3" />
+                    <span className="text-sm text-gray-600">
+                      点击或拖拽上传图片
+                    </span>
+                  </label>
+                </div>
+
+                {preview && (
+                  <div className="mt-4">
+                    <img
+                      src={preview}
+                      alt="预览"
+                      className="w-full h-64 object-contain rounded-lg"
+                    />
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>调整设置</CardTitle>
+              <CardDescription>自定义图片参数</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="width">宽度 (px)</Label>
+                    <input
+                      id="width"
+                      type="number"
+                      value={settings.width}
+                      onChange={(e) => setSettings({...settings, width: parseInt(e.target.value)})}
+                      className="w-full mt-1 px-3 py-2 border rounded-md"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="height">高度 (px)</Label>
+                    <input
+                      id="height"
+                      type="number"
+                      value={settings.height}
+                      onChange={(e) => setSettings({...settings, height: parseInt(e.target.value)})}
+                      className="w-full mt-1 px-3 py-2 border rounded-md"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="quality">质量 (%)</Label>
+                  <input
+                    id="quality"
+                    type="range"
+                    min="1"
+                    max="100"
+                    value={settings.quality}
+                    onChange={(e) => setSettings({...settings, quality: parseInt(e.target.value)})}
+                    className="w-full mt-1"
+                  />
+                  <span className="text-sm text-gray-600">{settings.quality}%</span>
+                </div>
+
+                <div>
+                  <Label htmlFor="format">输出格式</Label>
+                  <Select
+                    value={settings.format}
+                    onValueChange={(value) => setSettings({...settings, format: value})}
+                  >
+                    <SelectTrigger className="w-full mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="jpeg">JPEG</SelectItem>
+                      <SelectItem value="png">PNG</SelectItem>
+                      <SelectItem value="webp">WebP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="colorMode">颜色模式</Label>
+                  <Select
+                    value={settings.colorMode}
+                    onValueChange={(value) => setSettings({...settings, colorMode: value})}
+                  >
+                    <SelectTrigger className="w-full mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="rgb">RGB</SelectItem>
+                      <SelectItem value="grayscale">灰度</SelectItem>
+                      <SelectItem value="cmyk">CMYK</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button
+                  onClick={processImage}
+                  disabled={!selectedFile || processing}
+                  className="w-full"
+                >
+                  {processing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      处理中...
+                    </>
+                  ) : (
+                    "处理图片"
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+
+        {processedImage && (
+          <Card className="mt-8">
+            <CardHeader>
+              <CardTitle>处理结果</CardTitle>
+              <CardDescription>
+                尺寸: {processedImage.settings.width} x {processedImage.settings.height} | 
+                格式: {processedImage.settings.format.toUpperCase()} | 
+                颜色模式: {processedImage.settings.colorMode.toUpperCase()}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <img
+                  src={processedImage.url}
+                  alt="处理后的图片"
+                  className="w-full h-auto rounded-lg"
+                />
+                <Button onClick={downloadImage} className="w-full">
+                  <Download className="mr-2 h-4 w-4" />
+                  下载图片
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </main>
   );
 }
